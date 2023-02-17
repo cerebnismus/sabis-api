@@ -5,7 +5,7 @@
 # Sakarya University 
 # Computer Science Department
 
-import random, time, os
+import random, time, os, re # re for regular expressions
 from selenium import webdriver
 from selenium.webdriver import Chrome
 from selenium.webdriver.chrome.options import Options
@@ -52,9 +52,9 @@ class DriverOptions(object):
 
         self.options = Options()
         self.options.headless = False
-        self.options.binary_location = '/Applications/Chrome.app/Contents/MacOS/Google Chrome'
+        # self.options.binary_location = '/Applications/Chrome.app/Contents/MacOS/Google Chrome'
         self.options.add_argument('--no-sandbox')
-        # self.options.add_argument('--start-maximized')
+        self.options.add_argument('--start-maximized')
         # self.options.add_argument('--start-fullscreen')
         self.options.add_argument('--single-process')
         self.options.add_argument('--disable-dev-shm-usage')
@@ -69,9 +69,9 @@ class DriverOptions(object):
         # following options reduce the RAM usage
         self.options.add_argument('--disable-extensions')
         self.options.add_argument('--disable-application-cache')
-        self.options.add_argument('--disable-gpu')
+        # self.options.add_argument('--disable-gpu')
 
-        self.options.add_argument('user-agent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.2 Safari/605.1.15"')
+        # self.options.add_argument('user-agent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.2 Safari/605.1.15"')
         # self.options.add_argument('--proxy-server=%s' % self.helperSpoofer.ip)
         # self.options.add_argument('--proxy-server=%s' % didsoft_proxy)
         
@@ -108,18 +108,92 @@ class WebDriver(DriverOptions):
         return driver
 
   
+# Get the news feed from the Sakarya University Computer Science Department Student Information System.
 login_url = "https://obs.sabis.sakarya.edu.tr"
-login_data = {
-	"Username": "",
-	"Password": ""
-}
+username = ""
+password = ""
 
 
 def main():
   
-	cs_sakarya()
+  # cs_sakarya()
+  driver = WebDriver()
+  driverinstance = driver.driver_instance
+  wait = WebDriverWait(driverinstance, 60)
+  driverinstance.get(login_url)
+  time.sleep(1)
   
-	driver = WebDriver()
-	driverinstance = driver.driver_instance
-	wait = WebDriverWait(driverinstance, 60)
-	driverinstance.get(login_url)
+  _email_input = wait.until(EC.presence_of_element_located((By.ID, 'Username')))
+  _email_input.send_keys(username)
+  _password_input = wait.until(EC.presence_of_element_located((By.ID, 'Password')))
+  _password_input.send_keys(password)
+  _login_button = wait.until(EC.presence_of_element_located((By.XPATH, '//*[@id="kt_login_form"]/div[4]/button')))
+  _login_button.click()
+  time.sleep(2)
+  
+   # scrape 'duyurular' with beautifulsoup
+  soup = BeautifulSoup(driverinstance.page_source, 'html.parser')
+  print('\nDuyurular')
+  print('-'*40)
+  
+  dates = soup.find_all('span', class_='text-muted')
+  titles = soup.find_all('a', class_='text-warning')
+  descriptions = soup.find_all('div', class_='text-dark font-weight-bold')
+  
+  # TODO: Colorize the output with colorama or termcolor or something else !
+  for i in range(len(dates)):
+    try:
+      print(dates[i].text)
+      # get first any alphabet or numeric characters from the title
+      first_alpha = re.search('[a-zA-Z0-9]', titles[i].text).start()
+      last_alpha = re.search('[a-zA-Z0-9]', titles[i].text[::-1]).start()
+      print(titles[i].text[first_alpha:len(titles[i].text)-last_alpha])
+      
+      # get first any alphabet or numeric characters from the description
+      first_alpha = re.search('[a-zA-Z0-9]', descriptions[i].text).start()
+      last_alpha = re.search('[a-zA-Z0-9]', descriptions[i].text[::-1]).start()
+      print(descriptions[i].text[first_alpha:len(descriptions[i].text)-last_alpha])
+      print()
+    except IndexError:
+      pass
+  
+  # scrape 'dersprogrami' with beautifulsoup
+  wait.until(EC.presence_of_element_located((By.XPATH, '//*[@id="kt_aside_menu"]/ul/li[3]/a'))).click()
+  time.sleep(1)
+  wait.until(EC.presence_of_element_located((By.XPATH, '//*[@id="kt_calendar"]/div[1]/div[3]/div/button[4]'))).click()
+  time.sleep(1)
+  
+  soup = BeautifulSoup(driverinstance.page_source, 'html.parser')
+  print('\nDers Programı')
+  print('-'*40)
+ 
+  days = soup.find_all('a', class_='fc-list-heading-main')
+  dates = soup.find_all('a', class_='fc-list-heading-alt')
+  times = soup.find_all('td', class_='fc-list-item-time')
+  titles = soup.find_all('td', class_='fc-list-item-title')
+  descriptions = soup.find_all('div', class_='fc-description')
+  
+  # TODO: Colorize the output with colorama or termcolor or something else !
+  
+  # cut last 12 characters from the title elements
+  for i in range(len(days)):
+    print(dates[i].text, days[i].text, times[i].text)
+    print(titles[i].text[:-12], descriptions[i].text)
+  
+  
+  time.sleep(2222)
+  
+  
+    
+if __name__ == "__main__":
+
+    while True:
+        try:
+            main()
+        except Exception as e:
+            print(e)
+            continue
+        break
+    
+# most of the time it can't get the IP address from the proxy and raise the error below
+# selenium.common.exceptions.WebDriverException: Message: unknown error: net::ERR_TUNNEL_CONNECTION_FAILED
